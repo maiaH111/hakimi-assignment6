@@ -6,7 +6,7 @@
 * 
 *  Name: Maia Hakimi  Student ID: 187568217 Date: March 10, 2023
 *
-*  Online (Cyclic) Link: ________________________________________________________
+*  Online (Cyclic) Link: https://famous-rose-walkingstick.cyclic.app
 *
 ********************************************************************************/ 
 
@@ -37,7 +37,7 @@ cloudinary.config({
 const upload = multer();
 
 app.use(express.static('public'));
-
+app.use(express.urlencoded({extended: true}));
 
 app.use(function(req,res,next){
     let route = req.path.substring(1);
@@ -68,6 +68,14 @@ hbs.handlebars.registerHelper('equal', function (lvalue, rvalue, options) {
 
 hbs.handlebars.registerHelper('safeHTML', function (context) {
     return stripJs(context);
+})
+
+
+hbs.handlebars.registerHelper('formatDate', function (dateObj) {
+    let year = dateObj.getFullYear();
+    let month = (dateObj.getMonth() + 1).toString();
+    let day = dateObj.getDate().toString();
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2,'0')}`;
 })
 
 
@@ -190,7 +198,10 @@ app.get('/posts', (req,res)=>{
     } 
 
     queryPromise.then(data=>{
-        res.render(path.join(__dirname, "/views/posts.hbs"), {posts: data});
+        if (data.length > 0)
+            res.render(path.join(__dirname, "/views/posts.hbs"), {posts: data});
+        else
+            res.render(path.join(__dirname, "/views/posts.hbs"), {message: "no results"});
     }).catch(err=>{
         res.render(path.join(__dirname, "/views/posts.hbs"), {message: "no results"});
     })
@@ -241,7 +252,11 @@ app.post("/posts/add", upload.single("featureImage"), (req,res)=>{
 });
 
 app.get('/posts/add', (req,res)=>{
-   res.render(path.join(__dirname, "/views/addPost.hbs"));
+    blogData.getCategories().then(data=>{
+        res.render(path.join(__dirname, "/views/addPost.hbs"), {categories: data});
+    }).catch(err=>{
+        res.render(path.join(__dirname, "/views/addPost.hbs"), {categories: []});
+    })
 }); 
 
 app.get('/post/:id', (req,res)=>{
@@ -254,15 +269,46 @@ app.get('/post/:id', (req,res)=>{
 
 app.get('/categories', (req,res)=>{
     blogData.getCategories().then((data=>{
-        res.render(path.join(__dirname, "/views/categories.hbs"), {categories: data});
+        if (data.length > 0)
+            res.render(path.join(__dirname, "/views/categories.hbs"), {categories: data});
+        else
+        res.render(path.join(__dirname, "/views/categories.hbs"), {message: "no results"});
     })).catch(err=>{
         res.render(path.join(__dirname, "/views/categories.hbs"), {message: "no results"});
     });
 });
 
+app.get('/categories/add', (req,res)=>{
+    res.render(path.join(__dirname, "/views/addCategory.hbs"));
+});
+
+app.post('/categories/add', (req, res) => {
+    blogData.addCategory(req.body).then(post=>{
+        res.redirect("/categories");
+    }).catch(err=>{
+        res.status(500).send(err);
+    })
+});
+
+app.get('/categories/delete/:id', (req,res)=>{
+    blogData.deleteCategoryById(req.params.id).then(post=>{
+        res.redirect("/categories");
+    }).catch(err=>{
+        res.status(500).send('Unable to remove category (Category not found).');
+    })
+});
+
+app.get('/posts/delete/:id', (req,res)=>{
+    blogData.deletePostById(req.params.id).then(post=>{
+        res.redirect("/posts");
+    }).catch(err=>{
+        res.status(500).send('Unable to remove post (Post not found).');
+    })
+});
+
 app.use((req,res)=>{
     res.status(404).render(path.join(__dirname, "/views/404.hbs"))
-})
+});
 
 blogData.initialize().then(()=>{
     app.listen(HTTP_PORT, () => { 
@@ -270,4 +316,4 @@ blogData.initialize().then(()=>{
     });
 }).catch((err)=>{
     console.log(err);
-})
+});
